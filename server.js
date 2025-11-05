@@ -180,6 +180,7 @@ app.post("/api/status", async (req, res) => {
 });
 
 // >>> PENTING: Gunakan PORT dari Environment Variable Railway <<<
+// Mengubah default fallback port dari 3000 menjadi 8080.
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 
