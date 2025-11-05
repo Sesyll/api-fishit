@@ -10,71 +10,93 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #1e293b; /* slate-800 */
-            color: #e2e8f0; /* slate-200 */
+            background-color: #111827; /* Gray-900 (Gelap sekali) */
+            color: #f3f4f6; /* Gray-100 */
         }
         .card {
-            background-color: #334155; /* slate-700 */
-            border-radius: 0.75rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            background-color: #1f2937; /* Gray-800 */
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+            border: 1px solid #374151; /* Gray-700 untuk border subtle */
             transition: all 0.3s ease;
         }
-        .status-online { background-color: #10b981; } /* emerald-500 */
-        .status-ingame { background-color: #f59e0b; } /* amber-500 */
-        .status-offline { background-color: #ef4444; } /* red-500 */
-        .status-unknown { background-color: #64748b; } /* slate-500 */
+        .status-online-non-game { background-color: #3b82f6; border-color: #2563eb; } /* Blue-500 */
+        .status-ingame { background-color: #10b981; border-color: #059669; } /* Emerald-500 */
+        .status-offline { background-color: #6b7280; border-color: #4b5563; } /* Gray-500 */
         .grid-item:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 25px -5px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+        /* Style untuk Tombol Mulai Tracking */
+        #toggle-button {
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        #toggle-button:hover:not(:disabled) {
+            transform: translateY(-1px);
         }
     </style>
 </head>
-<body class="p-4 md:p-8 min-h-screen">
+<body class="p-4 md:p-10 min-h-screen">
 
     <div class="max-w-6xl mx-auto">
-        <h1 class="text-4xl font-bold text-center mb-6 text-indigo-400">Roblox Status Tracker</h1>
-        <p class="text-center text-slate-400 mb-8">Lacak status teman-teman Anda secara *real-time*.</p>
+        <h1 class="text-4xl font-extrabold text-center mb-10 text-white">Roblox Status Tracker</h1>
 
         <!-- Pesan Status Global -->
         <div id="message-area" class="mb-6"></div>
 
-        <!-- Panel Kontrol -->
-        <div class="card p-5 mb-8 flex flex-col md:flex-row gap-4 items-end">
-            <div class="flex-grow w-full">
-                <label for="roblox-cookie" class="block text-sm font-medium mb-1 text-slate-300">Cookie .ROBLOSECURITY</label>
-                <input type="text" id="roblox-cookie" placeholder="Masukkan nilai cookie Anda di sini..."
-                       class="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 text-white placeholder-slate-400">
-                <p class="text-xs mt-1 text-slate-400">Cookie diperlukan untuk akses status secara pribadi.</p>
+        <!-- Panel Kontrol (Input Cookie) -->
+        <div class="card p-4 mb-8 flex items-center gap-3">
+            <!-- Input Cookie -->
+            <div class="flex-grow">
+                <input type="password" id="roblox-cookie" placeholder="Masukkan nilai cookie Anda di sini..."
+                       class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-400 text-lg">
+                <p class="text-xs mt-2 text-gray-400">
+                    * Cookie diperlukan untuk melihat detail game (Game Name/MapName) secara akurat. Cookie <span class="text-red-400">tidak disimpan</span>.
+                </p>
             </div>
             
+            <!-- Tombol Tracking -->
             <button id="toggle-button" onclick="toggleTracking()"
-                    class="w-full md:w-auto px-6 py-2.5 rounded-lg font-semibold transition-colors duration-200 bg-indigo-600 hover:bg-indigo-700 text-white">
+                    class="flex-shrink-0 px-8 py-2 rounded-md font-semibold text-white bg-blue-600 hover:bg-blue-700">
                 Mulai Tracking
             </button>
         </div>
 
-        <!-- Statistik dan Hasil -->
-        <div class="card p-5">
-            <div class="flex flex-wrap justify-between items-center mb-4 border-b border-slate-600 pb-3">
-                <h2 class="text-2xl font-semibold">Hasil Tracking</h2>
-                <div class="flex flex-wrap gap-4 text-sm font-medium">
-                    <span id="stat-total" class="px-3 py-1 rounded-full bg-slate-600">Total: 0</span>
-                    <span id="stat-online" class="px-3 py-1 rounded-full bg-emerald-600">Online: 0</span>
-                    <span id="stat-ingame" class="px-3 py-1 rounded-full bg-amber-600">In Game: 0</span>
-                    <span id="stat-offline" class="px-3 py-1 rounded-full bg-red-600">Offline: 0</span>
-                </div>
+        <!-- Statistik Utama (Total, Online, In Game) - Desain Baru -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Total Akun -->
+            <div id="stat-card-total" class="card p-5 text-center bg-gray-700 border-gray-600">
+                <h3 class="text-lg font-medium text-gray-400">Total Akun</h3>
+                <p id="stat-total" class="text-5xl font-bold mt-2 text-white">0</p>
             </div>
 
+            <!-- Online (Non-Game) -->
+            <div id="stat-card-online" class="card p-5 text-center bg-blue-900 border-blue-600">
+                <h3 class="text-lg font-medium text-blue-300">Online (Non-Game)</h3>
+                <p id="stat-online" class="text-5xl font-bold mt-2 text-blue-300">0</p>
+            </div>
+
+            <!-- In Game/Studio -->
+            <div id="stat-card-ingame" class="card p-5 text-center bg-emerald-900 border-emerald-600">
+                <h3 class="text-lg font-medium text-emerald-300">In Game</h3>
+                <p id="stat-ingame" class="text-5xl font-bold mt-2 text-emerald-300">0</p>
+            </div>
+        </div>
+
+        <!-- Judul Hasil -->
+        <h2 class="text-2xl font-semibold mb-4 text-white">Hasil Status Pengguna:</h2>
+
+        <!-- Kontainer Hasil -->
+        <div class="card p-5">
             <!-- Loading Indicator (Hidden by default) -->
             <div id="loading-indicator" class="hidden text-center p-10">
-                <svg class="animate-spin h-8 w-8 text-indigo-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-8 w-8 text-blue-400 mx-auto mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-slate-400">Memuat status...</p>
+                <p class="text-gray-400">Memuat status...</p>
             </div>
-
-            <!-- Kontainer Hasil -->
+            
             <div id="results-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 <!-- Data status pengguna akan dimasukkan di sini -->
             </div>
@@ -107,7 +129,7 @@
             const color = type === 'success' ? 'bg-emerald-500' : 
                           type === 'error' ? 'bg-red-500' : 'bg-blue-500';
             area.innerHTML = `
-                <div class="${color} text-white p-3 rounded-lg font-medium transition-opacity duration-300 opacity-100">
+                <div class="${color} text-white p-3 rounded-md font-medium transition-opacity duration-300 opacity-100">
                     ${message}
                 </div>
             `;
@@ -127,27 +149,29 @@
                 button.disabled = false;
                 if (refreshIntervalId) {
                     button.innerHTML = 'Hentikan Tracking';
-                    button.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                    button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
                     button.classList.add('bg-red-600', 'hover:bg-red-700');
                 } else {
                     button.innerHTML = 'Mulai Tracking';
                     button.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    button.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                    button.classList.add('bg-blue-600', 'hover:bg-blue-700');
                 }
                 button.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         }
         
         function updateStatistics(data) {
-            const online = data.filter(u => u.status === 'Online').length;
+            // Kita akan menghitung status offline/unknown sebagai 'Offline'
+            const onlineNonGame = data.filter(u => u.status === 'Online').length;
             const ingame = data.filter(u => u.status === 'In Game' || u.status === 'In Studio').length;
-            const offline = data.filter(u => u.status === 'Offline').length;
+            const offline = data.filter(u => u.status === 'Offline' || u.status === 'Unknown').length; // Offline + Unknown
             const total = data.length;
 
-            document.getElementById('stat-total').textContent = `Total: ${total}`;
-            document.getElementById('stat-online').textContent = `Online: ${online}`;
-            document.getElementById('stat-ingame').textContent = `In Game: ${ingame}`;
-            document.getElementById('stat-offline').textContent = `Offline: ${offline}`;
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-online').textContent = onlineNonGame;
+            // Di desain baru, kita hanya menampilkan 3 statistik utama:
+            document.getElementById('stat-ingame').textContent = ingame;
+            // Stat Offline tidak ditampilkan sebagai card terpisah, tapi dihitung.
         }
         
         function createResultGridItem(user) {
@@ -157,13 +181,15 @@
 
             switch (user.status) {
                 case 'Online':
-                    colorClass = 'status-online';
+                    // Menggunakan warna Biru (seperti di card Online Non-Game)
+                    colorClass = 'bg-blue-600 hover:bg-blue-700'; 
                     statusText = 'Online';
                     details = `<p class="text-sm text-white/90">Di Website</p>`;
                     break;
                 case 'In Game':
                 case 'In Studio':
-                    colorClass = 'status-ingame';
+                    // Menggunakan warna Hijau (seperti di card In Game)
+                    colorClass = 'bg-emerald-600 hover:bg-emerald-700'; 
                     statusText = 'In Game';
                     details = `<p class="text-sm font-bold text-white/90">${user.mapName}</p>`;
                     if (user.placeId) {
@@ -171,24 +197,25 @@
                     }
                     break;
                 case 'Offline':
-                    colorClass = 'status-offline';
-                    statusText = 'Offline';
-                    details = `<p class="text-sm text-white/90">Terakhir: ${user.lastLocation}</p>`;
-                    break;
+                case 'Unknown': // Jika status tidak diketahui, perlakukan sebagai offline
                 default:
-                    colorClass = 'status-unknown';
-                    statusText = 'Unknown';
-                    details = user.error ? `<p class="text-xs text-white/70">${user.error}</p>` : `<p class="text-xs text-white/70">Status tidak diketahui</p>`;
+                    // Menggunakan warna Abu-abu gelap (seperti di card Total)
+                    colorClass = 'bg-gray-700 hover:bg-gray-600'; 
+                    statusText = user.error ? 'Error' : 'Offline';
+                    details = user.error ? 
+                        `<p class="text-xs text-red-300">Gagal: ${user.error}</p>` : 
+                        `<p class="text-sm text-gray-400">Terakhir: ${user.lastLocation || 'N/A'}</p>`;
+                    break;
             }
 
             return `
-                <div class="card grid-item p-4 ${colorClass}">
+                <div class="card grid-item p-4 ${colorClass} border border-gray-600">
                     <div class="flex items-center justify-between mb-2">
                         <h3 class="text-lg font-bold truncate text-white">${user.username}</h3>
                         <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white">${statusText}</span>
                     </div>
                     ${details}
-                    <p class="text-xs mt-2 text-white/50">ID: ${user.userId || 'N/A'}</p>
+                    <p class="text-xs mt-2 text-gray-400">ID: ${user.userId || 'N/A'}</p>
                 </div>
             `;
         }
