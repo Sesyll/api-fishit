@@ -11,9 +11,8 @@ app.use(express.json());
 
 // *** PENTING: HEALTH CHECK UNTUK RAILWAY ***
 // Endpoint ini memastikan Railway tahu bahwa server sudah berjalan.
-app.get("/", (req, res) => {
-    // Railway akan memanggil endpoint ini untuk verifikasi.
-    res.status(200).send("Roblox Status API is LIVE.");
+app.get('/', (req, res) => {
+    res.status(200).send('API Server Running');
 });
 // **********************************************
 
@@ -76,6 +75,7 @@ async function getGameInfo(id, cookie) {
         return "Unknown Place";
     }
 }
+
 
 // *** ENDPOINT INI MENGGUNAKAN POST dan MENDAPATKAN USERNAME DARI BODY REQUEST ***
 app.post("/api/status", async (req, res) => {
