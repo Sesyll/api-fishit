@@ -4,7 +4,7 @@
   "description": "Roblox Status Tracker as a desktop application using Electron.",
   "main": "electron-main.js", 
   "scripts": {
-    "start": "pm2-runtime server.js"
+    "start": "node server.js"
   },
   "devDependencies": {
     
