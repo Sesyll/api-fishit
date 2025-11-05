@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roblox Status Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar style for aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+        /* Make the main content container fill the screen height minus header/footer space */
+        .main-content {
+            min-height: calc(100vh - 8rem); /* 100vh minus some padding/header */
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'roblox-blue': '#00a2ff',
+                        'roblox-dark': '#1e2022',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8 font-sans">
+
+    <div class="max-w-7xl mx-auto main-content">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-roblox-blue tracking-tight">
+                Roblox Crew Status
+            </h1>
+            <p class="text-gray-400 mt-2">Masukkan Cookie untuk Melihat Status Real-Time</p>
+        </header>
+
+        <!-- Cookie Input Form -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <input 
+                    type="password" 
+                    id="roblox-cookie" 
+                    placeholder="Masukkan Cookie .ROBLOSECURITY Anda di sini (wajib)" 
+                    class="flex-1 p-3 rounded-lg bg-gray-700 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-roblox-blue text-sm placeholder-gray-400 transition"
+                    required
+                >
+                <button 
+                    id="fetch-button" 
+                    onclick="toggleTracking()" 
+                    class="bg-roblox-blue hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-[1.02] active:scale-95 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                >
+                    Mulai Tracking
+                </button>
+            </div>
+            <p id="cookie-note" class="text-xs text-gray-400 mt-3">
+                * Cookie diperlukan untuk melihat detail game (Game Name/MapName) secara akurat. Cookie tidak disimpan.
+            </p>
+            <div id="message-box" class="mt-4 hidden p-3 rounded-lg text-sm" role="alert"></div>
+            <div id="status-refresh" class="text-xs text-gray-500 mt-2 hidden">
+                Status tracking aktif. Refresh otomatis setiap 15 detik.
+            </div>
+        </div>
+
+        <!-- STATISTIC BAR (NEWLY ADDED) -->
+        <div id="statistic-bar" class="grid grid-cols-3 gap-4 mb-8">
+            <div class="bg-gray-800 p-4 rounded-xl text-center shadow-md border-b-4 border-gray-600">
+                <p class="text-sm text-gray-400 font-medium">Total Akun</p>
+                <p id="stat-total" class="text-3xl font-extrabold text-gray-200 mt-1">0</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl text-center shadow-md border-b-4 border-yellow-500">
+                <p class="text-sm text-gray-400 font-medium">Online (Non-Game)</p>
+                <p id="stat-online" class="text-3xl font-extrabold text-yellow-500 mt-1">0</p>
+            </div>
+            <div class="bg-gray-800 p-4 rounded-xl text-center shadow-md border-b-4 border-green-600">
+                <p class="text-sm text-gray-400 font-medium">In Game</p>
+                <p id="stat-ingame" class="text-3xl font-extrabold text-green-600 mt-1">0</p>
+            </div>
+        </div>
+        <!-- END STATISTIC BAR -->
+
+        <!-- Status Results -->
+        <h2 class="text-2xl font-bold text-gray-200 mb-4">Hasil Status Pengguna:</h2>
+        <div id="results-container">
+            <!-- Loading and results will be injected here -->
+            <div id="loading-indicator" class="hidden text-center p-8">
+                <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-roblox-blue mx-auto mb-3"></div>
+                <p class="text-gray-400">Memuat status dari server...</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // API endpoint
+        const API_URL = 'http://localhost:3000/api/status';
+        // Variabel untuk menyimpan ID interval refresh
+        let refreshIntervalId = null; 
+        // Waktu refresh dalam milidetik (15 detik)
+        const REFRESH_RATE = 15000; 
+
+        /**
+         * Menampilkan pesan notifikasi di kotak pesan.
+         */
+        function showMessage(message, type = 'info') {
+            const box = document.getElementById('message-box');
+            box.textContent = message;
+            box.className = 'mt-4 p-3 rounded-lg text-sm'; 
+            box.classList.remove('hidden');
+
+            // Logic untuk pewarnaan pesan (sama seperti sebelumnya)
+            switch (type) {
+                case 'success':
+                    box.classList.add('bg-green-800', 'text-green-200');
+                    break;
+                case 'error':
+                    box.classList.add('bg-red-800', 'text-red-200');
+                    break;
+                case 'info':
+                default:
+                    box.classList.add('bg-blue-800', 'text-blue-200');
+                    break;
+            }
+            setTimeout(() => { box.classList.add('hidden'); }, 5000);
+        }
+
+        /**
+         * Mengubah status loading.
+         */
+        function setLoading(isLoading) {
+            document.getElementById('loading-indicator').classList.toggle('hidden', !isLoading);
+            // Tombol hanya dinonaktifkan saat fetch pertama/manual, bukan saat interval
+            if (!refreshIntervalId) {
+                document.getElementById('fetch-button').disabled = isLoading;
+                document.getElementById('fetch-button').textContent = isLoading ? 'Memuat...' : 'Mulai Tracking';
+            }
+        }
+
+        /**
+         * Logika inti untuk mengambil data status pengguna dari backend.
+         */
+        async function performFetch() {
+            const cookieInput = document.getElementById('roblox-cookie');
+            const cookie = cookieInput.value.trim();
+            const resultsContainer = document.getElementById('results-container');
+            
+            // Set loading hanya pada fetch pertama kali (atau jika interval belum berjalan)
+            const isInitialFetch = refreshIntervalId === null;
+
+            if (isInitialFetch) {
+                resultsContainer.innerHTML = document.getElementById('loading-indicator').outerHTML;
+                setLoading(true);
+            }
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'x-roblox-cookie': cookie 
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server merespons dengan status ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // NEW: Update statistics before rendering grid
+                updateStatistics(data);
+
+                renderResults(data);
+
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                showMessage(`Gagal mengambil data: ${error.message}. Cek koneksi API dan Cookie.`, 'error');
+                // Hentikan tracking jika terjadi error fetch
+                if (refreshIntervalId) {
+                    toggleTracking();
+                }
+                resultsContainer.innerHTML = '';
+            } finally {
+                if (isInitialFetch) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        /**
+         * NEW FUNCTION: Menghitung dan memperbarui ringkasan statistik.
+         * @param {Array<object>} data Array data status pengguna.
+         */
+        function updateStatistics(data) {
+            let totalAccounts = 0;
+            let totalOnline = 0;
+            let totalInGame = 0;
+
+            data.forEach(user => {
+                // Hanya hitung jika tidak ada error
+                if (!user.error) {
+                    totalAccounts++;
+                    if (user.status === 'Online') {
+                        totalOnline++;
+                    } else if (user.status === 'In Game') {
+                        totalInGame++;
+                    }
+                }
+            });
+
+            document.getElementById('stat-total').textContent = totalAccounts;
+            document.getElementById('stat-online').textContent = totalOnline;
+            document.getElementById('stat-ingame').textContent = totalInGame;
+        }
+
+        /**
+         * Membuat item kartu untuk tampilan grid. (Tidak ada perubahan)
+         */
+        function createResultGridItem(user) {
+            // ... (Kode createResultGridItem sama seperti sebelumnya) ...
+            if (user.error) {
+                return `
+                    <div class="bg-red-900/50 p-5 rounded-xl shadow-xl border border-red-700/50 hover:shadow-red-500/30 transition duration-300">
+                        <p class="font-bold text-xl text-red-400 mb-2">${user.username}</p>
+                        <p class="text-sm text-red-300">Gagal mendapatkan status:</p>
+                        <p class="text-xs italic text-red-300/80 mt-1">${user.error}</p>
+                    </div>
+                `;
+            }
+
+            let statusColor, statusIcon, locationLabel, locationValue;
+
+            if (user.status === 'Offline') {
+                statusColor = 'bg-gray-600 text-white';
+                statusIcon = '⚫';
+                locationLabel = 'Lokasi Terakhir';
+                locationValue = user.lastLocation;
+            } else if (user.status === 'Online') {
+                statusColor = 'bg-yellow-500 text-gray-900';
+                statusIcon = '🟡';
+                locationLabel = 'Aktivitas';
+                locationValue = 'Online di Roblox';
+            } else { // In Game
+                statusColor = 'bg-green-600 text-white';
+                statusIcon = '🟢';
+                locationLabel = 'Bermain Game';
+                locationValue = user.mapName;
+            }
+
+            return `
+                <div class="bg-gray-800 p-5 rounded-xl shadow-xl border border-gray-700 hover:border-roblox-blue transition duration-300 transform hover:scale-[1.01] flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center mb-3">
+                            <p class="font-extrabold text-2xl text-roblox-blue truncate">${user.username}</p>
+                            <span class="flex items-center text-xs font-semibold px-3 py-1 rounded-full ${statusColor} ml-2">
+                                ${statusIcon} <span class="ml-1">${user.status}</span>
+                            </span>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <p class="text-sm text-gray-400 font-medium">${locationLabel}:</p>
+                            <p class="text-lg font-semibold text-gray-200 truncate">${locationValue}</p>
+                        </div>
+                    </div>
+
+                    ${user.placeId ? `
+                        <p class="text-xs text-gray-500 mt-4 pt-3 border-t border-gray-700/50">Place ID: ${user.placeId}</p>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+
+        /**
+         * Merender hasil ke DOM menggunakan grid layout. (Tidak ada perubahan)
+         */
+        function renderResults(data) {
+            const resultsContainer = document.getElementById('results-container');
+            
+            if (data.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-gray-400 text-center p-8">Tidak ada pengguna yang dilacak.</p>';
+                return;
+            }
+
+            // Grid View: Dibuat padat untuk mengakomodasi banyak akun dalam satu layar
+            const gridHTML = `
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 p-1">
+                    ${data.map(createResultGridItem).join('')}
+                </div>
+            `;
+            
+            resultsContainer.innerHTML = gridHTML;
+        }
+
+        /**
+         * Mengaktifkan atau menonaktifkan tracking otomatis. (Tidak ada perubahan)
+         */
+        function toggleTracking() {
+            const button = document.getElementById('fetch-button');
+            const cookieInput = document.getElementById('roblox-cookie');
+            const refreshNote = document.getElementById('status-refresh');
+
+            if (refreshIntervalId) {
+                // Stop Tracking
+                clearInterval(refreshIntervalId);
+                refreshIntervalId = null;
+                button.textContent = 'Mulai Tracking';
+                button.classList.replace('bg-red-600', 'bg-roblox-blue');
+                cookieInput.disabled = false; // Aktifkan input cookie lagi
+                refreshNote.classList.add('hidden');
+                showMessage('Tracking dihentikan.', 'info');
+            } else {
+                // Start Tracking
+                const cookie = cookieInput.value.trim();
+                if (!cookie) {
+                    showMessage('Mohon masukkan cookie .ROBLOSECURITY Anda terlebih dahulu.', 'error');
+                    return;
+                }
+                
+                // Lakukan fetch pertama kali, lalu set interval
+                performFetch(); 
+                
+                refreshIntervalId = setInterval(performFetch, REFRESH_RATE);
+                
+                button.textContent = 'Berhenti Tracking';
+                button.classList.replace('bg-roblox-blue', 'bg-red-600');
+                cookieInput.disabled = true; // Nonaktifkan input cookie saat tracking berjalan
+                refreshNote.classList.remove('hidden');
+                showMessage(`Tracking dimulai! Refresh setiap ${REFRESH_RATE / 1000} detik.`, 'success');
+            }
+        }
+        
+        // Bersihkan interval saat halaman ditutup untuk mencegah memory leak
+        window.addEventListener('beforeunload', () => {
+            if (refreshIntervalId) {
+                clearInterval(refreshIntervalId);
+            }
+        });
+    </script>
+</body>
+</html>
