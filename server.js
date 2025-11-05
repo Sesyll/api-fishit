@@ -3,156 +3,176 @@ const axios = require("axios");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
-// Load environment variables (though ROBLOX_COOKIE is now optional)
 dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Helper Functions to get User and Presence Info ---
+// Set HEADERS, prefer request header cookie over .env cookie
+const getHeaders = (cookie) => {
+    return cookie ? { Cookie: `.ROBLOSECURITY=${cookie}` } : {};
+};
 
 /**
- * Retrieves the Roblox User ID for a given username.
- * @param {string} username The Roblox username.
- * @returns {Promise<number|undefined>} The user ID or undefined if not found.
+ * Mengambil User ID untuk daftar username.
+ * Mengembalikan objek map {username: userId}.
  */
-async function getUserId(username) {
-  const resp = await axios.post(
-    "https://users.roblox.com/v1/usernames/users",
-    { usernames: [username] },
-    { headers: { "Content-Type": "application/json" } }
-  );
-
-  return resp.data.data?.[0]?.id;
-}
-
-/**
- * Generates the necessary headers, optionally including the Cookie.
- * It reads the cookie from the custom request header 'x-roblox-cookie'.
- * @param {object} req The Express request object.
- * @returns {object} The headers object for Axios requests.
- */
-function getHeaders(req) {
-  // Read the cookie dynamically from a custom header
-  const cookie = req.headers['x-roblox-cookie'];
-
-  if (!cookie) {
-    return {};
-  }
-
-  // Format the cookie correctly for the Roblox API
-  return {
-    'Cookie': `.ROBLOSECURITY=${cookie}`
-  };
-}
-
-/**
- * Retrieves the presence status for a specific user ID.
- * @param {number} userId The Roblox user ID.
- * @param {object} headers The dynamic headers object containing the cookie (if available).
- * @returns {Promise<object>} The user presence data.
- */
-async function getPresence(userId, headers) {
-  const body = { userIds: [userId] };
-  // Use the dynamically provided headers
-  const resp = await axios.post("https://presence.roblox.com/v1/presence/users", body, { headers });
-  return resp.data.userPresences[0];
-}
-
-/**
- * Retrieves the game name (place details) for a given placeId or universeId.
- * @param {number} placeId The Roblox place or universe ID.
- * @param {object} headers The dynamic headers object containing the cookie (if available).
- * @returns {Promise<string>} The game name or "Unknown Place".
- */
-async function getGameInfo(placeId, headers) {
-  if (!placeId) return "Unknown Place";
-
-  try {
-    const resp = await axios.get(
-      `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${placeId}`,
-      { headers } // Use the dynamically provided headers
-    );
-    const placeData = resp.data[0];
-    // universeId is used in the presence data, but the API endpoint 
-    // requires placeIds. If the presence only gives universeId and not placeId,
-    // this call might fail if universeId isn't a valid placeId. 
-    // We stick to presence.placeId for best results.
-    return placeData?.name || "Unknown Place";
-  } catch (err) {
-    // Log error for debugging, but return generic message
-    console.error(`Error fetching game info for placeId ${placeId}:`, err.message);
-    return "Unknown Place";
-  }
-}
-
-
-// --- API Endpoint ---
-
-app.get("/api/status", async (req, res) => {
-  const users = [
-    "Taloongoodboy",
-    "Basoka001",
-    "Basooka002",
-    "Basooka003",
-    "Basooka004",
-    "nyukk1000",
-    "nyukk1002",
-    "nyukk10003",
-    "kuya0600",
-    "uubyyror",
-    "talonbaikk63",
-    "ermancing_1",
-    "Duck_CHILL37",
-    "Julian_Dawn72",
-    "NovaPrism200531",
-    "XxOw3nQu33nTurb0xX",
-    "Fr0st_TIG3R53",
-    "IsabellaFireBlade201",
-    "StormMoonGolden79"
-  ]
-  const results = [];
-
-  // Get dynamic headers for this specific request
-  const dynamicHeaders = getHeaders(req);
-
-  for (const username of users) {
-    try {
-      const userId = await getUserId(username);
-
-      const presence = await getPresence(userId, dynamicHeaders);
-
-      let mapName = "Offline";
-      if (presence.placeId) {
-        mapName = await getGameInfo(presence.placeId, dynamicHeaders);
-      } else if (presence.userPresenceType === 3) {
-        mapName = "In Game (placeId hidden)";
-      } else if (presence.userPresenceType === 2) {
-        mapName = "In Studio";
-      } else if (presence.userPresenceType === 1) {
-        mapName = "Online";
-      }
-
-      results.push({
-        username,
-        status:
-          presence.userPresenceType === 0
-            ? "Offline"
-            : presence.userPresenceType === 1
-              ? "Online"
-              : "In Game", 
-        placeId: presence.placeId || null,
-        mapName,
-        lastLocation: presence.lastLocation || "FISH IT",
-      });
-    } catch (err) {
-      console.error(`Error processing user ${username}:`, err.message);
-      results.push({ username, error: err.message });
+async function getUserIds(usernames) {
+    if (usernames.length === 0) return {};
+    
+    // Roblox API hanya bisa memproses 100 username per request
+    const chunks = [];
+    for (let i = 0; i < usernames.length; i += 100) {
+        chunks.push(usernames.slice(i, i + 100));
     }
-  }
 
-  res.json(results);
+    const userMap = {};
+    for (const chunk of chunks) {
+        try {
+            const resp = await axios.post(
+                "https://users.roblox.com/v1/usernames/users",
+                { usernames: chunk },
+                { headers: { "Content-Type": "application/json" } }
+            );
+            resp.data.data.forEach(user => {
+                userMap[user.name.toLowerCase()] = user.id;
+            });
+        } catch (error) {
+            console.error("Error fetching user IDs chunk:", error.message);
+            // Melanjutkan ke chunk berikutnya
+        }
+    }
+    return userMap;
+}
+
+/**
+ * Mengambil nama game berdasarkan Place ID atau Universe ID.
+ */
+async function getGameInfo(id, cookie) {
+    if (!id) return "Unknown Place";
+
+    const headers = getHeaders(cookie);
+
+    try {
+        // Coba universeId dulu (jika ada), lalu placeId. 
+        // Endpoint ini bekerja untuk keduanya meskipun namanya place-details.
+        const resp = await axios.get(
+            `https://games.roblox.com/v1/games/multiget-place-details?placeIds=${id}`,
+            { headers }
+        );
+        const placeData = resp.data[0];
+        return placeData?.name || "Unknown Place";
+    } catch (err) {
+        return "Unknown Place";
+    }
+}
+
+// *** ENDPOINT INI MENGGUNAKAN POST dan MENDAPATKAN USERNAME DARI BODY REQUEST ***
+app.post("/api/status", async (req, res) => {
+    // Cookie diambil dari header khusus 'x-roblox-cookie' yang dikirim oleh frontend
+    const cookie = req.headers['x-roblox-cookie'];
+    // Username diambil dari body request (req.body.users)
+    const users = req.body.users; 
+    
+    if (!users || users.length === 0) {
+        return res.status(400).json({ error: "Daftar pengguna kosong." });
+    }
+
+    // 1. Get all User IDs first
+    const uniqueUsers = [...new Set(users.map(u => u.trim()).filter(u => u))];
+    const userMap = await getUserIds(uniqueUsers);
+    
+    // 2. Filter out usernames that couldn't be found and prepare for presence call
+    const validUserIds = Object.values(userMap);
+    
+    // 3. Get Presence for all valid users in one API call
+    const presenceBody = { userIds: validUserIds };
+    let presenceData = { userPresences: [] };
+    const headers = getHeaders(cookie);
+
+    if (validUserIds.length > 0) {
+        try {
+             const resp = await axios.post("https://presence.roblox.com/v1/presence/users", presenceBody, { headers });
+             presenceData = resp.data;
+        } catch (e) {
+             console.error("Presence API failed:", e.message);
+        }
+    }
+    
+    // Map userId to presence object for quick lookup
+    const presenceMap = {};
+    presenceData.userPresences.forEach(p => {
+        presenceMap[p.userId] = p;
+    });
+    
+    // 4. Gather all results
+    const results = [];
+    
+    // Reverse lookup to find username from userId
+    const userIdToUsernameMap = Object.entries(userMap).reduce((acc, [username, id]) => {
+        acc[id] = username;
+        return acc;
+    }, {});
+
+
+    for (const username of uniqueUsers) {
+        const userId = userMap[username.toLowerCase()];
+
+        if (!userId) {
+            results.push({ username, error: "Pengguna tidak ditemukan di Roblox." });
+            continue;
+        }
+
+        const presence = presenceMap[userId];
+        
+        // --- Determine Status and Game Info ---
+        let mapName = "Offline";
+        let status = "Offline";
+        let placeId = null;
+        let universeId = null;
+        let lastLocation = "Offline";
+
+        if (presence) {
+            placeId = presence.placeId;
+            universeId = presence.universeId;
+            lastLocation = presence.lastLocation;
+            
+            if (presence.userPresenceType === 3) { // In Game
+                status = "In Game";
+                mapName = await getGameInfo(presence.universeId || presence.placeId, cookie);
+                if (!presence.placeId) {
+                     mapName = "In Game (placeId hidden)";
+                }
+
+            } else if (presence.userPresenceType === 2) { // In Studio
+                status = "In Game"; 
+                mapName = "In Studio";
+            }
+            
+            else if (presence.userPresenceType === 1) { // Online
+                status = "Online";
+                mapName = "Online di Website";
+            }
+        }
+
+        results.push({
+            username: userIdToUsernameMap[userId] || username, 
+            userId, 
+            status,
+            placeId,
+            universeId, 
+            mapName,
+            lastLocation,
+        });
+    }
+
+    res.json(results);
 });
 
-app.listen(3000, () => console.log("✅ Server running at http://localhost:3000"));
+// >>> PENTING: Gunakan PORT dari Environment Variable Railway <<<
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+
+// Ekspor aplikasi Express untuk digunakan dalam kasus pengujian atau integrasi (optional)
+module.exports = app;
