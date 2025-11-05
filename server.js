@@ -9,6 +9,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// *** PENTING: HEALTH CHECK UNTUK RAILWAY ***
+// Endpoint ini memastikan Railway tahu bahwa server sudah berjalan.
+app.get("/", (req, res) => {
+    // Railway akan memanggil endpoint ini untuk verifikasi.
+    res.status(200).send("Roblox Status API is LIVE.");
+});
+// **********************************************
+
+
 // Set HEADERS, prefer request header cookie over .env cookie
 const getHeaders = (cookie) => {
     return cookie ? { Cookie: `.ROBLOSECURITY=${cookie}` } : {};
