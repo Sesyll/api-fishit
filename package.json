@@ -4,13 +4,7 @@
   "description": "Roblox Status Tracker as a desktop application using Electron.",
   "main": "electron-main.js", 
   "scripts": {
-<<<<<<< HEAD
     "start": "node server.js"
-=======
-    "start": "node server.js",  
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder"
->>>>>>> 6597fec9f606b4d7445728b6b3b8555aed59a7d2
   },
   "devDependencies": {
     
@@ -21,8 +15,4 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 6597fec9f606b4d7445728b6b3b8555aed59a7d2
